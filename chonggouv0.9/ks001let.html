@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+    <head>
+        <meta charset="utf-8">
+        <!--引入echarts-->
+        <script src="echarts.min.js"></script>
+        <style type="text/css">
+            #main {height:100%;width:100%;position:absolute;}
+            body {margin:0px;padding:0px;overflow:hidden;}
+        </style>
+    </head>
+    <body>
+        <!--为echarts准备一个具备大小宽高的Dom-->
+        <div id="main"></div>
+        <script type="text/javascript">
+            //基于准备好的dom,初始化ecahrts实例
+            let myChart = echarts.init(document.getElementById('main'));
+            let color1=['#65b5c2', '#ffbe05','#1dc499','#177bbb', '#3ddcde','#177bbb','#1ccacc', '#e33244','#ffbe05','#3ddcde']
+            let option = {
+                    animation: false,
+                    title:{
+                        text:'实时数据展示',
+                        left:'center'
+                    },
+                    tooltip:{
+                        show:true,
+                        trigger: 'axis'
+                    },
+                    legend:{//这里要从pyqt拿数据
+                        data:[],
+                        top:'1%',
+                        right:'10%'
+                    },
+                    xAxis:{
+                        type:'category',
+                        data:(function (){
+                            let now = new Date();
+                            let res = [];
+                            let len = 100;
+                            while (len--) {
+                                res.unshift(now.toLocaleTimeString().replace(/^\D*/,''));
+                                now = new Date(now - 100);//时间-100跟定时器要一致
+                            }
+                            return res;
+                        })(),
+                        name:'时间 /x',
+                        nameLocation:'center',
+                        nameGap:30
+                    },
+                    yAxis:{
+                        min:0,
+                        //max:200,
+                        type:'value',
+                        name:'数值  / y',
+                        nameLocation:'center',
+                        nameGap:40,
+                        splitLine: {
+                                show: true
+                                    }
+                    },
+                    dataZoom: [
+                        {
+                            type: 'slider',
+                            show: true,
+                            yAxisIndex: [0],
+                            left: '93%',
+                            start: 30,
+                            end: 70
+                        },
+                        {
+                            type: 'inside',
+                            yAxisIndex: [0],
+                            start: 20,
+                            end: 60
+                        }
+                    ],
+                    series:[]
+            };
+
+            myChart.setOption(option);
+            myChart.on('dataZoom',function(event){
+                if(event.batch){
+                        start=event.batch[0].start;
+                        end=event.batch[0].end;
+                    }else{
+                        start=event.start;
+                        end=event.end;
+                    };
+                });
+            
+            function setValue(jsons,keylist){
+                option.legend.data = keylist
+                let Series = [];
+                for(let i=0;i<jsons.length;i++){  //循环4次
+                    let item = {        //循环每次创建一个item
+                        name:jsons[i].name,  //item的name是json里面的name
+                        symbol: "none",
+                        type:'line',
+                        smooth:true,
+                        itemStyle:{
+                            normal:{
+                                color:color1[i]//最多10个哦！！
+                            }
+                        },
+                        data:(function (){
+                                let isok = 0;
+                                let result = [];
+                                for(let j=0;j<option.series.length;j++){
+                                    if(jsons[i].name === option.series[j].name){
+                                        result = option.series[j].data;
+                                        result.shift();
+                                        result.push(jsons[i].value);
+                                        isok = 1;
+                                        break;
+                                    }
+                                }
+                                if(isok === 0){
+                                    let len = 100;
+                                    while (len--) {
+                                        result.push(0);
+                                    }
+                                }
+
+                                result.shift();
+                                result.push(jsons[i].value);
+                                return result;
+                            })()
+                    }
+                    Series.push(item);
+                }
+                option.series = Series;
+                //x轴移动
+                axisData = (new Date()).toLocaleTimeString().replace(/^\D*/,'');
+                option.xAxis.data.shift();
+                option.xAxis.data.push(axisData);
+                option.dataZoom[0].start=start;
+	            option.dataZoom[0].end=end;
+                myChart.setOption(option);
+            }
+
+
+         
+            window.onresize = myChart.resize;
+
+        </script>
+    </body>
+</html>

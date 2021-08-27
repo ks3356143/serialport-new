@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+    <head>
+        <meta charset="utf-8">
+        <!--引入echarts-->
+        <script src="echarts.min.js"></script>
+        <style type="text/css">
+            #main {height:100%;width:100%;position:absolute;}
+            body {margin:0px;padding:0px;overflow:hidden;}
+        </style>
+    </head>
+    <body>
+        <!--为echarts准备一个具备大小宽高的Dom-->
+        <div id="main"></div>
+        <script type="text/javascript">
+            //基于准备好的dom,初始化ecahrts实例
+            let myChart = echarts.init(document.getElementById('main'));
+            let color1=['#65b5c2', '#ffbe05','#1dc499','#177bbb', '#3ddcde','#177bbb','#1ccacc', '#e33244','#ffbe05','#3ddcde']
+            let option = {
+                    animation: true,
+                    title:{
+                        text:'历史数据展示',
+                        left:'center'
+                    },
+                    tooltip:{
+                        show:true,
+                        trigger: 'axis'
+                    },
+                    legend:{//这里要从pyqt拿数据
+                        data:[],
+                        top:'8%',
+                        right:'10%'
+                    },
+                    xAxis:{
+                        type:'category',
+                        data:[],
+                        name:'时间 /x',
+                        nameLocation:'center',
+                        nameGap:30
+                    },
+                    yAxis:{
+                        min:0,
+                        //max:200,
+                        type:'value',
+                        name:'数值  / y',
+                        nameLocation:'center',
+                        nameGap:30,
+                        splitLine: {
+                                show: true
+                                    }
+                    },
+                    dataZoom: [
+                        {
+                            type: 'slider',
+                            show: true,
+                            yAxisIndex: [0],
+                            left: '93%',
+                            start: 30,
+                            end: 70
+                        },
+                        {
+                            type: 'inside',
+                            yAxisIndex: [0],
+                            start: 20,
+                            end: 60
+                        }
+                    ],
+                    series:[]
+            };
+            myChart.setOption(option);
+
+            function setValue(jsons,keylist){
+                option.legend.data = keylist
+
+                let Series = [];
+                let lengg = jsons.length-1
+
+                for(let i=0;i<lengg;i++){  //循环4次
+                    let item = {        //循环每次创建一个item
+                        name:keylist[i],  //item的name是keylist里面的元素
+                        symbol: "none",
+                        type:'line',
+                        smooth:true,
+                        itemStyle:{
+                            normal:{
+                                color:color1[i]//最多10个哦！！
+                            }
+                        },
+                        data:jsons[i]
+                    }
+                    Series.push(item);
+                }
+                //处理x轴数据json[lengg]
+                let xdatas = jsons[lengg]
+                
+                option.xAxis.data = xdatas
+
+                option.series = Series;
+
+                myChart.setOption(option);
+            }
+
+
+         
+            window.onresize = myChart.resize;
+
+        </script>
+    </body>
+</html>

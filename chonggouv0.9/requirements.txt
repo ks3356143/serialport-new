@@ -1,0 +1,11 @@
+PyQt5==5.12.2
+pyserial==3.4
+pyqtgraph==0.12.2
+
+# JavaScript需求
+JavaScript == ES6
+echart == 1.0.1
+QtWebEngine == 5.2
+pandas
+numpy
+qtmodern
