@@ -1403,7 +1403,7 @@ class Send_bin_Thread(QtCore.QThread):
         for i in range(bin_len_bao_num): #整包发一次
             temp1 = bin_data_str[i*464:i*464+464] #拿出第一包出来
             bao_xuhao = "{:04X}".format(i)
-            youxiao_lenth = '00EA' #固定234字节，是包序号+有效数据
+            youxiao_lenth = 'EA' #固定234字节，是包序号+有效数据
             #checksum计算
             send_bao = "".join([ZT1,ZT2,youxiao_lenth,MLZ,bao_xuhao,temp1])
             checksum_all = 0
