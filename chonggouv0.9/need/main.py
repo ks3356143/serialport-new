@@ -20,6 +20,9 @@ import os
 import re
 import codecs
 import threading
+import win32con
+from win32process import ExitProcess, SuspendThread, ResumeThread
+import ctypes
 
 from PyQt5 import QtCore,QtGui
 from PyQt5 import QtWebEngineWidgets
@@ -93,7 +96,10 @@ class userMain(QMainWindow,Ui_MainWindow):
         self.trans = QTranslator()
         self.setWindowTitle('测试平台遥测工具')
 
-        # # 初始化queue
+        #读取配置文件数值
+        self.settings = QtCore.QSettings("./config.ini", QtCore.QSettings.IniFormat)
+        self.settings.setIniCodec("UTF-8")
+        self.BAUD = self.settings.value("SETUP/UART_BAUD", 0, type=str)
         # self.queue_recv = Queue(maxsize=240)
 
         # 初始化串口对象
@@ -107,6 +113,7 @@ class userMain(QMainWindow,Ui_MainWindow):
         self.com.signalRcvError.connect(self.on_com_signalRcvError) #当接收到错误数据信号连接
         self.com.signalRcvdata.connect(self.on_com_signalRcvdata) #当解析变成dict后发送到UI
         self.com.signalguangbo.connect(self.on_com_signalguangbo) #广播消息传数组过来了
+        
 
         #初始化端口组合list和波特率list
         self.update_comboBoxPortList()#更新系统支持的串口设备并更新端口组合框内容
@@ -114,7 +121,7 @@ class userMain(QMainWindow,Ui_MainWindow):
 
         #子窗口状态变量
         self.zichuankou = 0 #0代表未打开，1代表已打开
-
+ 
         #初始化默认界面
         #~~~~~~~~
         self.save_dict = {} #串口接收进来的数据字典
@@ -183,6 +190,7 @@ class userMain(QMainWindow,Ui_MainWindow):
         self.user_send_length = 0 #用户选择的参数数量
         self.user_send_message = '' #用int数组展示
         self.mapDict = {}
+        self.time_set = 0.1
 
         #~~~~~~~~~~~加载用户变量表格~~~~~~~~~~~~~
         if debug==True:
@@ -204,17 +212,22 @@ class userMain(QMainWindow,Ui_MainWindow):
         self.pushButton_order.clicked.connect(self.create_order) #生成获取参数的指令
         self.pushButton_raise.clicked.connect(self.create_order_send) #发送生产的指令
         self.pushButtonSave.clicked.connect(self.save_file_thread) #点击启动保存数据线程
-        self.pushButtonSaveCancel.clicked.connect(self.save_file_cancel) #点击停止保存文件
+        self.pushButtonSaveCancel.clicked.connect(self.save_file_user_cancel) #点击停止保存文件
         self.pushButton.clicked.connect(self.show_echarts) #点击展示echarts图像
         self.pushButton_2.clicked.connect(self.choosecsv) #选择csv文件
         #~~~~~~~~~~~重构BIN文件发送界面~~~~~~~~~~~~~
         self.pushButton_3.clicked.connect(self.chougou_cb) #点击发送重构指令
         self.pushButton_bin.clicked.connect(self.bin_file_cb) #点击选中文件获得全类变量绝对路径self.map_file_name
         self.pushButton_send_bin.clicked.connect(self.send_bin_cb) #点击发送bin文件
+        self.suspendButton.clicked.connect(self.suspend_bin_cb) #点击暂停发送
+        self.resumeButton.clicked.connect(self.resume_bin_cb) #点击继续发送分包
+        self.stopButton.clicked.connect(self.stop_bin_cb) #点击停止发送
         self.bin_send_thread = Send_bin_Thread(self) #创建发送bin文件线程
         self.bin_send_thread.sin_out.connect(self.text_display) #把发送bin文件的消息传给text_display函数
+        self.bin_send_thread.signal_binsend_buttion.connect(self.setSend_ok_cb) #当线程执行完毕解锁发送bin文件按钮
         self.bin_send_thread.signal_proccessbar.connect(self.proccessbar_display)
         self.sin_out1.connect(self.text_display)
+        
 
         #~~~~~~~~~~生产Table1~用来展示变量值~~~~~~~~~
         self.table1.setColumnCount(2)#信息列数固定为2
@@ -223,6 +236,29 @@ class userMain(QMainWindow,Ui_MainWindow):
         self.table1.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         QHeaderView.Stretch #自适应宽度
         self.table1.setRowCount(15) #后面需要根据用户选择数量进行更变，在生产指令的时候
+        
+        #~~~~~~~~~~生产Table2~用来展示变量值~~~~~~~~~
+        self.table2.setColumnCount(2)#信息列数固定为2
+        self.table2.setHorizontalHeaderLabels(["状态量","状态"])
+        #最后一列自动拉伸
+        self.table2.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        QHeaderView.Stretch #自适应宽度
+        self.table2.setRowCount(15) #后面需要根据用户选择数量进行更变，在生产指令的时候
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        item1 = QTableWidgetItem("目前阶段")
+        item1.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
+        item2 = QTableWidgetItem("完成状态")
+        item2.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
+        item3 = QTableWidgetItem("丢失帧号")
+        item3.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
+        item4 = QTableWidgetItem("错误码")
+        item4.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
+        #设置table2遥测变量的左侧值
+        self.table2.setItem(0,0,item1)
+        self.table2.setItem(1,0,item2)
+        self.table2.setItem(2,0,item3)
+        self.table2.setItem(3,0,item4)
+
 
         #下面函数用于第三个tab页面
         self.loadweb()
@@ -311,7 +347,7 @@ class userMain(QMainWindow,Ui_MainWindow):
         self.comboBoxBand.clear()
         self.comboBoxBand.addItems([str(i) for i in suportBandRateList])
         # 设置默认波特率
-        self.comboBoxBand.setCurrentText("921600")
+        self.comboBoxBand.setCurrentText(self.BAUD)
         # print(self.comboBoxBand.currentIndex())
         self.comboBoxBand.setEnabled(True)
 
@@ -771,9 +807,18 @@ class userMain(QMainWindow,Ui_MainWindow):
             QMessageBox.critical(self,'关闭文件失败','未知原因导致关闭文件失败')
 
         try:
+            self.save_df = self.save_df.append(self.save_dict,ignore_index=True)
             self.mythread1.stop()
         except Exception as e:
             QMessageBox.critical(self,'没有文件可以关闭','关闭保存文件失败')
+            
+        try:
+            if self.bin_send_thread.isRunning():
+                #self._thread.quit()
+                self.bin_send_thread.terminate()# 强制 
+            del self.bin_send_thread
+        except:
+            pass
 
 
     @QtCore.pyqtSlot()
@@ -833,12 +878,14 @@ class userMain(QMainWindow,Ui_MainWindow):
             if not os.path.exists('data/datafile/'):
                 os.mkdir('data/datafile/')
             try:
+                self.mythread1.stop()
+            except:
+                pass
+            try:
                 self.file_name1 = "data/datafile/" + utils.get_current_date() + ".csv"
-                # self.csv_file_1 = open(file_name1,'a+',newline='')
-                # self.writer_1 = csv.writer(self.csv_file_1)
-                # 改为dataframe储存
                 self.save_df = pd.DataFrame() #清空dataframe
                 self.mythread1 = RunThread1(self)
+                self.mythread1.signal_wenjian.connect(self.save_file_cancel)
                 self.mythread1.start()
             except Exception as e:
                 QMessageBox.warning(self,"打开文件错误","打开文件错误，请检查")
@@ -850,7 +897,6 @@ class userMain(QMainWindow,Ui_MainWindow):
             save_path = self.file_name1
             self.save_df.to_csv(save_path,index=False,mode='a')
             self.save_df = pd.DataFrame()
-            QMessageBox.critical(self,'保存文件成功','保存文件成功，清空DataFrame成功！')
         except:
             QMessageBox.critical(self,'保存文件失败','保存文件失败，清空DataFrame失败!!!')
             pass
@@ -859,6 +905,32 @@ class userMain(QMainWindow,Ui_MainWindow):
             self.mythread1.stop()
         except:
             QMessageBox.critical(self,'线程停止失败','线程停止失败！！！')
+            pass
+        try:
+            del self.mythread1
+        except:
+            pass
+            
+        self.save_file_thread()
+        
+    def save_file_user_cancel(self):
+        try:
+            save_path = self.file_name1
+            self.save_df.to_csv(save_path,index=False,mode='a')
+            self.save_df = pd.DataFrame()
+            QMessageBox.about(self,'保存文件成功','保存文件成功请查看file/datafile文件')
+        except:
+            QMessageBox.critical(self,'保存文件失败','保存文件失败，清空DataFrame失败!!!')
+            pass
+
+        try:
+            self.mythread1.stop()
+        except:
+            QMessageBox.critical(self,'线程停止失败','线程停止失败！！！')
+            pass
+        try:
+            del self.mythread1
+        except:
             pass
 
     #生成指令按钮后生成指令
@@ -961,7 +1033,15 @@ class userMain(QMainWindow,Ui_MainWindow):
                 if self.bin_file_name[0]:
                     #self.tabWidget.setEnabled(False)
                     try:
+                        if self.spinBox.value() == 0:
+                            self.time_set = 0.1
+                        else:  
+                            self.time_set = self.spinBox.value()
                         self.bin_send_thread.start()
+                        self.pushButton_send_bin.setEnabled(False)
+                        self.suspendButton.setEnabled(True)
+                        self.stopButton.setEnabled(True) 
+                        
                     except:
                         QMessageBox.warning(self,"未知原因","未知原因导致失败")
                 else:
@@ -970,8 +1050,45 @@ class userMain(QMainWindow,Ui_MainWindow):
                 QMessageBox.warning(self,"串口未打开","先打开串口才能发送")
         except:
             QMessageBox.warning(self,"开始发送bin文件","发送失败，原因未知")
-        
+    
+    #点击暂停发送bin文件
+    def suspend_bin_cb(self):
+        if self.bin_send_thread.handle == -1:
+            return print('句柄错误')
+        ret = SuspendThread(self.bin_send_thread.handle)
+        self.sin_out1.emit('发送挂起暂停') 
+ 
+        self.suspendButton.setEnabled(False)
+        self.resumeButton.setEnabled(True)
 
+    #点击继续发送分包
+    def resume_bin_cb(self):
+        if self.bin_send_thread.handle == -1:
+            return print('handle is wrong') 
+ 
+        ret = ResumeThread(self.bin_send_thread.handle)
+        self.sin_out1.emit('恢复线程') 
+ 
+        self.suspendButton.setEnabled(True)
+        self.resumeButton.setEnabled(False)
+
+    #点击停止发送分包线程
+    def stop_bin_cb(self):
+        ret = ctypes.windll.kernel32.TerminateThread(self.bin_send_thread.handle, 0)
+        self.sin_out1.emit('终止线程') 
+
+
+        if self.bin_send_thread.isRunning():
+            #self._thread.quit()
+            self.bin_send_thread.terminate()# 强制结束
+            
+        self.pushButton_send_bin.setEnabled(True)
+        self.suspendButton.setEnabled(False)
+        self.resumeButton.setEnabled(False)
+        self.stopButton.setEnabled(False)
+        self.progressBar.setValue(0)
+        
+        
     #定义点击echatrs显示按钮函数
     def show_echarts(self):
         try:
@@ -1313,24 +1430,15 @@ class userMain(QMainWindow,Ui_MainWindow):
     def on_com_signalguangbo(self,guangbo_msg):
         print("UI层输出数据为：",guangbo_msg)
         #处理丢失帧号为十进制
-        Qe = QtGui.QFont()
-        Qe.setPointSize(12)
-        Qe.setBold(True)
         try:
-            self.label_15.setText(self.chonggou_step[guangbo_msg[0]])
-            self.label_15.setFont(Qe)
-            self.label_16.setText(self.wancheng_status[guangbo_msg[1]])
+            self.table2.setItem(0,1,QTableWidgetItem(guangbo_msg[0]))
+            self.table2.setItem(1,1,QTableWidgetItem(guangbo_msg[1]))
             if guangbo_msg[1] == '00':
-                self.label_16.setStyleSheet("color:red")
+                self.table2.item(1 ,0).setForeground(QtGui.QBrush(QtGui.QColor(255,0,0)))
             else:
-                self.label_16.setStyleSheet("color:green")
-            self.label_16.setFont(Qe)
-            self.label_17.setText(str(int(guangbo_msg[2],16)))
-            self.label_17.setFont(Qe)
-            self.label_18.setText(self.cuowuma[guangbo_msg[3]])
-            self.label_18.setFont(Qe)
-            self.label_19.setText("正在运行")
-            self.label_19.setFont(Qe)
+                self.table2.item(1 ,0).setForeground(QtGui.QBrush(QtGui.QColor(204,255,153)))
+            self.table2.setItem(2,1,QTableWidgetItem(guangbo_msg[2]))
+            self.table2.setItem(3,1,QTableWidgetItem(guangbo_msg[3]))
         except:
             pass
 
@@ -1346,18 +1454,33 @@ class userMain(QMainWindow,Ui_MainWindow):
         pass
 
     def text_display(self,text):
+        self.textEdit.setFocusPolicy(QtCore.Qt.NoFocus) 
         self.textEdit.append(text)
+        #光标移动到最后
+        cursor = self.textEdit.textCursor().End
+        self.textEdit.moveCursor(cursor)
 
+    def setSend_ok_cb(self):
+        self.pushButton_send_bin.setEnabled(True)
+        self.stopButton.setEnabled(False)
+        self.resumeButton.setEnabled(False)
+        self.suspendButton.setEnabled(False)
+        
 class RunThread1(QtCore.QThread):
+    signal_wenjian = QtCore.pyqtSignal()
     def __init__(self,parent):
         super().__init__()
         self.parent = parent #将主界面信息传过来
     
     def run(self): #接收主线程送来的信号进行保存
+        count = 0
         while True:
             #存入dataframe
             self.parent.save_df = self.parent.save_df.append(self.parent.save_dict,ignore_index=True)
-            time.sleep(0.1) #注意以后改
+            time.sleep(0.0333333) #注意以后改
+            count += 1
+            if count >= 1048576:
+                self.signal_wenjian.emit()
             
     def stop(self):
         self.terminate()
@@ -1365,11 +1488,24 @@ class RunThread1(QtCore.QThread):
 class Send_bin_Thread(QtCore.QThread):
     sin_out = QtCore.pyqtSignal(str)
     signal_proccessbar = QtCore.pyqtSignal(int)
+    #2
+    handle = -1
+    signal_binsend_buttion = QtCore.pyqtSignal()
+    
     def __init__(self,parent):
         super().__init__()
         self.parent = parent
 
     def run(self):
+        
+        try:
+            self.handle = ctypes.windll.kernel32.OpenThread(
+                win32con.PROCESS_ALL_ACCESS, False, int(QtCore.QThread.currentThreadId()))
+        except Exception as e:
+            print('获取发送线程失败', e)
+        #1
+        print('线程ID为', int(QtCore.QThread.currentThreadId())) 
+
         ZT1 = 'E1'
         ZT2 = '16'
         MLZ = '33'
@@ -1401,6 +1537,7 @@ class Send_bin_Thread(QtCore.QThread):
         self.sin_out.emit('需要发送的数据总长度为：{}'.format(len(bin_data_str)))
         
         for i in range(bin_len_bao_num): #整包发一次
+            ################
             temp1 = bin_data_str[i*464:i*464+464] #拿出第一包出来
             bao_xuhao = "{:04X}".format(i)
             youxiao_lenth = 'EA' #固定234字节，是包序号+有效数据
@@ -1416,19 +1553,18 @@ class Send_bin_Thread(QtCore.QThread):
             
             buf1 = bytes.fromhex(send_bao1)
             self.parent.com.send_order(buf1)
-            self.sin_out.emit('当前发送的包序号为：{}'.format(i+1))
-            time.sleep(0.1)
+            self.sin_out.emit('当前发送的包序号为：{}'.format(i))
+            time.sleep(self.parent.time_set)
             
             #for循环创建listWidget中的item
-            itemStr = "分包:" + str(i+1)
+            itemStr = "分包:" + str(i)
             aItem = QListWidgetItem()
             aItem.setText(itemStr)
             self.parent.listWidget_2.addItem(aItem)
             #给proccessbar传信号
             self.signal_proccessbar.emit(int((i+1)/(bin_len_bao_num+1)*100))
             
-            
-            
+
         #最后小包发一次
         temp2 = bin_data_str[bin_len_bao_num*464:]
         youxiao_lenth_last = "{:02X}".format(bin_len_shengxia+2)
@@ -1447,17 +1583,20 @@ class Send_bin_Thread(QtCore.QThread):
 
         buf2 = bytes.fromhex(send_bao_last)
         self.parent.com.send_order(buf2)
-        self.sin_out.emit('当前发送的包序号为尾包,包序号为{}'.format(bin_len_bao_num+1))
-        time.sleep(0.1)
+        self.sin_out.emit('当前发送的包序号为尾包,包序号为{}'.format(bin_len_bao_num))
+        time.sleep(self.parent.time_set)
         self.sin_out.emit('发送完毕')
         
-        itemStr = "分包:" + str(bin_len_bao_num+1)
+        itemStr = "分包:" + str(bin_len_bao_num)
         aItem = QListWidgetItem()
         aItem.setText(itemStr)
         self.parent.listWidget_2.addItem(aItem)
         self.signal_proccessbar.emit(100)
         
+        #发送设置开始按钮可按的信号
+        self.signal_binsend_buttion.emit()
         file_bin.close() #关闭文件
+        
         
 
 '''测试代码
