@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from PyQt5 import QtCore
 from PyQt5.QtWidgets import QApplication
 import sys
 from need.main import userMain

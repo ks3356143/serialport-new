@@ -18,7 +18,7 @@
     <item row="0" column="0">
      <widget class="QTabWidget" name="tabWidget">
       <property name="currentIndex">
-       <number>1</number>
+       <number>0</number>
       </property>
       <widget class="QWidget" name="tab">
        <attribute name="title">
@@ -44,20 +44,27 @@
           <property name="title">
            <string>生成指令</string>
           </property>
-          <layout class="QVBoxLayout" name="verticalLayout_5">
+          <layout class="QVBoxLayout" name="verticalLayout_4">
            <item>
-            <layout class="QVBoxLayout" name="verticalLayout_4">
-             <item>
+            <layout class="QGridLayout" name="gridLayout_20">
+             <item row="2" column="1">
+              <widget class="QLineEdit" name="lineEdit_2"/>
+             </item>
+             <item row="2" column="0">
+              <widget class="QLabel" name="label_10">
+               <property name="text">
+                <string>生成的指令为</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="0" colspan="2">
               <widget class="QPushButton" name="pushButton_order">
                <property name="text">
                 <string>生成指令</string>
                </property>
               </widget>
              </item>
-             <item>
-              <widget class="QLineEdit" name="lineEdit_2"/>
-             </item>
-             <item>
+             <item row="3" column="0" colspan="2">
               <widget class="QPushButton" name="pushButton_raise">
                <property name="text">
                 <string>发送指令</string>

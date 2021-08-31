@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
-# from need.mystatuslist import ListView
+# 可以使用下面面加入QtableWidget方法
+#self.tableWidget.insertRow(self.tableRowCnt)
 from pandas.core.frame import DataFrame
 LOG_FORMAT = "%(asctime)s>%(levelname)s>PID:%(process)d %(thread)d>%(module)s>%(funcName)s>%(lineno)d>%(message)s"
 logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT, )
@@ -100,7 +101,6 @@ class userMain(QMainWindow,Ui_MainWindow):
         self.settings = QtCore.QSettings("./config.ini", QtCore.QSettings.IniFormat)
         self.settings.setIniCodec("UTF-8")
         self.BAUD = self.settings.value("SETUP/UART_BAUD", 0, type=str)
-        # self.queue_recv = Queue(maxsize=240)
 
         # 初始化串口对象
         self.comBoxPortBuf = ""#当前使用的串口号
@@ -133,8 +133,8 @@ class userMain(QMainWindow,Ui_MainWindow):
         self.sndTotal = 0
         self.sndTotalLast = 0
 
-        self.sndAsciiHex = True#发送ASCII模式
-        self.radioButtonTxAscii.setChecked(True) #发送模式初始化为ASCII模式
+        self.sndAsciiHex = False#发送ASCII模式
+        self.radioButtonTxHex.setChecked(True) #发送模式初始化为ASCII模式
         self.radioButtonStop1Bit.setChecked(True)
         self.radioButtonParityOdd.setChecked(True)
         self.radioButtonData8Bit.setChecked(True)
@@ -271,7 +271,8 @@ class userMain(QMainWindow,Ui_MainWindow):
         self.pushButton_6.clicked.connect(self.chongqi_cb)
         
         
-        self.chonggou_step = {'44':'第一阶段',"33":"第二阶段","55":"第三阶段","66":"第四阶段"}
+        self.chonggou_step = {'44':'接收编程阶段',"33":"分包发送阶段",
+                              "55":"烧写阶段","66":"重启阶段"}
         self.wancheng_status = {'00':'未完成','01':'已完成'}
         self.cuowuma = {'01':'暂未定义'}
         
@@ -508,6 +509,7 @@ class userMain(QMainWindow,Ui_MainWindow):
 
                     _translate = QtCore.QCoreApplication.translate
                     self.pushButtonOpen.setText(_translate("MainWindow","关闭串口"))
+                    self.pushButtonOpen.setStyleSheet('''QPushButton{background:#FF2D2D;border-radius:2px;}QPushButton:hover{background:#FFB5B5;}''')
 
                     # 在userSerial类中已经实现了接收完成signalRcv信号机制，无需启动线程刷屏，只需将信号关联到对应的槽函数即可
                     # # 开启接收线程刷屏
@@ -538,8 +540,10 @@ class userMain(QMainWindow,Ui_MainWindow):
     def pushButtonOpen_State_Reset(self):
         _translate = QtCore.QCoreApplication.translate
         self.pushButtonOpen.setText(_translate("MainWindow", "打开串口"))
+        self.pushButtonOpen.setStyleSheet('''QPushButton{background:#00EC00;border-radius:2px;}QPushButton:hover{background:#DFFFDF;}''')
         # 设置Checked状态会导致on_pushButtonOpen_toggled触发
         self.pushButtonOpen.setChecked(False)
+
 
     # 串口设备更新按键
     @QtCore.pyqtSlot()
@@ -988,6 +992,9 @@ class userMain(QMainWindow,Ui_MainWindow):
                 self.lineEdit_2.setText(send_code)
                 self.lineEdit_2.setReadOnly(True)
                 #生产指令完毕
+                #字符在顶部发送栏显示
+                self.textEditSend.clear()
+                self.textEditSend.append(send_code.upper())
             else:
                 QMessageBox.warning(self,"无法生产指令","程序没有收到选择参数")
         else:
@@ -1009,6 +1016,7 @@ class userMain(QMainWindow,Ui_MainWindow):
                 print(sendddd)
                 self.user_send_message = sendddd
                 self.user_send_length = len(self.user_para_addr)
+                self.sndTotal+= len(buf)
             else:
                 QMessageBox.warning(self,"暂未生产指令！","请先生产指令")
         else:
@@ -1190,6 +1198,7 @@ class userMain(QMainWindow,Ui_MainWindow):
                             send_bao_last = "".join([ZT1,ZT2,youxiao_lenth_last,MLZ,bao_xuhao_last,temp2,'00'*(232 - bin_len_shengxia),checksum_fenbao_last])
                             
                             buf2 = bytes.fromhex(send_bao_last)
+                            self.sndTotal += len(send_bao_last)
                             self.com.send_order(buf2)
                             print('当前发送的包序号为尾包,包序号为{}'.format(bin_len_bao_num+1))
                             time.sleep(0.1)
@@ -1211,7 +1220,7 @@ class userMain(QMainWindow,Ui_MainWindow):
         MLZ = '55'
         operate_code = 'AA'
         fill_zero = '00' * 232
-
+        
         #判断用户选择模式
         dilTitle = "请选择主备"
         txtLabel = "请选择主/备份烧写模式"
@@ -1230,6 +1239,7 @@ class userMain(QMainWindow,Ui_MainWindow):
             print("烧写指令为：",send_code_shaoxie)
             if self.com.getPortState():
                 buf_send = bytes.fromhex(send_code_shaoxie)
+                self.sndTotal += len(send_code_shaoxie)
                 self.com.send_order(buf_send)
                 print("烧写指令发送完成")
             else:
@@ -1262,6 +1272,7 @@ class userMain(QMainWindow,Ui_MainWindow):
             print("重启指令为：",send_code_shaoxie)
             if self.com.getPortState():
                 buf_send = bytes.fromhex(send_code_shaoxie)
+                self.sndTotal += len(send_code_shaoxie)
                 self.com.send_order(buf_send)
                 print("重启指令发送完成")
             else:
@@ -1340,6 +1351,7 @@ class userMain(QMainWindow,Ui_MainWindow):
             self.com.send_order(buf_send)
             
             file_bin.close() #关闭文件
+            self.sndTotal += len(send_end)
         except:
             QMessageBox.warning(self,"错误","未选择文件，请先选择文件")
         
@@ -1431,13 +1443,16 @@ class userMain(QMainWindow,Ui_MainWindow):
         print("UI层输出数据为：",guangbo_msg)
         #处理丢失帧号为十进制
         try:
-            self.table2.setItem(0,1,QTableWidgetItem(guangbo_msg[0]))
-            self.table2.setItem(1,1,QTableWidgetItem(guangbo_msg[1]))
+            chonggou_step = self.chonggou_step[guangbo_msg[0]]
+            self.table2.setItem(0,1,QTableWidgetItem(chonggou_step))
+            wancheng_status = self.wancheng_status[guangbo_msg[1]]
+            self.table2.setItem(1,1,QTableWidgetItem(wancheng_status))
             if guangbo_msg[1] == '00':
                 self.table2.item(1 ,0).setForeground(QtGui.QBrush(QtGui.QColor(255,0,0)))
             else:
-                self.table2.item(1 ,0).setForeground(QtGui.QBrush(QtGui.QColor(204,255,153)))
-            self.table2.setItem(2,1,QTableWidgetItem(guangbo_msg[2]))
+                self.table2.item(1 ,0).setForeground(QtGui.QBrush(QtGui.QColor(34,139,34)))
+            errorcode = int(guangbo_msg[2],16)
+            self.table2.setItem(2,1,QTableWidgetItem(str(errorcode)))
             self.table2.setItem(3,1,QTableWidgetItem(guangbo_msg[3]))
         except:
             pass
@@ -1481,8 +1496,10 @@ class RunThread1(QtCore.QThread):
             count += 1
             if count >= 1048576:
                 self.signal_wenjian.emit()
+            self.parent.pushButtonSave.setStyleSheet('''QPushButton{background:#28FF28;}QPushButton:hover{background:#79FF79;}''')
             
     def stop(self):
+        self.parent.pushButtonSave.setStyleSheet('''QPushButton{background:	#FF0000;}QPushButton:hover{background:#ff7575;}''')
         self.terminate()
         
 class Send_bin_Thread(QtCore.QThread):
@@ -1552,6 +1569,8 @@ class Send_bin_Thread(QtCore.QThread):
             send_bao1 = "".join([ZT1,ZT2,youxiao_lenth,MLZ,bao_xuhao,temp1,checksum_fenbao])
             
             buf1 = bytes.fromhex(send_bao1)
+            #统计发送总数
+            self.parent.sndTotal += len(send_bao1)
             self.parent.com.send_order(buf1)
             self.sin_out.emit('当前发送的包序号为：{}'.format(i))
             time.sleep(self.parent.time_set)
@@ -1561,6 +1580,7 @@ class Send_bin_Thread(QtCore.QThread):
             aItem = QListWidgetItem()
             aItem.setText(itemStr)
             self.parent.listWidget_2.addItem(aItem)
+            
             #给proccessbar传信号
             self.signal_proccessbar.emit(int((i+1)/(bin_len_bao_num+1)*100))
             
@@ -1582,6 +1602,8 @@ class Send_bin_Thread(QtCore.QThread):
         self.sin_out.emit(f'最后一个包发送的指令为{send_bao_last}')
 
         buf2 = bytes.fromhex(send_bao_last)
+        #统计发送总数
+        self.parent.sndTotal += len(send_bao_last)
         self.parent.com.send_order(buf2)
         self.sin_out.emit('当前发送的包序号为尾包,包序号为{}'.format(bin_len_bao_num))
         time.sleep(self.parent.time_set)
