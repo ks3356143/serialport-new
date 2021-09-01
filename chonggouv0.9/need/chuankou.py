@@ -483,7 +483,7 @@ class Ui_MainWindow(object):
         self.spinBox = QtWidgets.QSpinBox(self.groupBox_10)
         self.spinBox.setPrefix("")
         self.spinBox.setMinimum(0)
-        self.spinBox.setMaximum(20)
+        self.spinBox.setMaximum(8000)
         self.spinBox.setSingleStep(1)
         self.spinBox.setObjectName("spinBox")
         self.gridLayout_17.addWidget(self.spinBox, 3, 1, 1, 1)
@@ -598,7 +598,7 @@ class Ui_MainWindow(object):
         self.toolBar.addAction(self.action_shutdown)
 
         self.retranslateUi(MainWindow)
-        self.tabWidget.setCurrentIndex(0)
+        self.tabWidget.setCurrentIndex(1)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
     def retranslateUi(self, MainWindow):

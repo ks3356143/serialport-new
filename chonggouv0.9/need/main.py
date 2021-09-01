@@ -1043,7 +1043,7 @@ class userMain(QMainWindow,Ui_MainWindow):
                         if self.spinBox.value() == 0:
                             self.time_set = 0.1
                         else:
-                            self.time_set = self.spinBox.value()
+                            self.time_set = self.spinBox.value()/1000
                         self.bin_send_thread.start()
                         self.pushButton_send_bin.setEnabled(False)
                         self.suspendButton.setEnabled(True)
