@@ -105,7 +105,7 @@ class userMain(QMainWindow,Ui_MainWindow):
         # 初始化串口对象
         self.comBoxPortBuf = ""#当前使用的串口号
         self.comPortList = [] #系统可用串口号
-        self.com = userSerial(baudrate=115200, timeout=0)#实例化串口对象,这里不就打开了？
+        self.com = userSerial(baudrate=self.BAUD, timeout=0)#实例化串口对象,这里不就打开了？
 
  
         # 自定义信号2个，一个是收到数据，一个是收到错误数据
@@ -228,7 +228,6 @@ class userMain(QMainWindow,Ui_MainWindow):
         self.bin_send_thread.signal_proccessbar.connect(self.proccessbar_display)
         self.sin_out1.connect(self.text_display)
         
-
         #~~~~~~~~~~生产Table1~用来展示变量值~~~~~~~~~
         self.table1.setColumnCount(2)#信息列数固定为2
         self.table1.setHorizontalHeaderLabels(["变量名","数值"])
@@ -1043,7 +1042,7 @@ class userMain(QMainWindow,Ui_MainWindow):
                     try:
                         if self.spinBox.value() == 0:
                             self.time_set = 0.1
-                        else:  
+                        else:
                             self.time_set = self.spinBox.value()
                         self.bin_send_thread.start()
                         self.pushButton_send_bin.setEnabled(False)
@@ -1167,7 +1166,7 @@ class userMain(QMainWindow,Ui_MainWindow):
                         print(fenbao_i.row())
                         i = fenbao_i.row()
                         if i != bin_len_bao_num:
-                            temp1 = bin_data_str[i*464:i*464+464] #拿出第一包出来
+                            temp1 = bin_data_str[i*464:i*464+464] 
                             bao_xuhao = "{:04X}".format(i)
                             youxiao_lenth = 'EA' #固定234字节，是包序号+有效数据
                             #checksum计算
@@ -1181,12 +1180,12 @@ class userMain(QMainWindow,Ui_MainWindow):
                             
                             buf1 = bytes.fromhex(send_bao1)
                             self.com.send_order(buf1)
-                            print('当前发送的包序号为：{},已发送完成'.format(i+1))
+                            print('当前发送的包序号为：{},已发送完成'.format(i))
                             time.sleep(0.1)
                         elif i == bin_len_bao_num:
                             temp2 = bin_data_str[bin_len_bao_num*464:]
-                            youxiao_lenth_last = "{:02X}".format(bin_len_shengxia)
-                            bao_xuhao_last = "{:04X}".format(bin_len_bao_num + 1)
+                            youxiao_lenth_last = "{:02X}".format(bin_len_shengxia + 2)
+                            bao_xuhao_last = "{:04X}".format(bin_len_bao_num)
                             #填充"00"
                             send_bao_last_temp = "".join([ZT1,ZT2,youxiao_lenth_last,MLZ,bao_xuhao_last,temp2,'00'*(232 - bin_len_shengxia)])
                             
@@ -1200,7 +1199,7 @@ class userMain(QMainWindow,Ui_MainWindow):
                             buf2 = bytes.fromhex(send_bao_last)
                             self.sndTotal += len(send_bao_last)
                             self.com.send_order(buf2)
-                            print('当前发送的包序号为尾包,包序号为{}'.format(bin_len_bao_num+1))
+                            print('当前发送的包序号为尾包,包序号为{}'.format(bin_len_bao_num))
                             time.sleep(0.1)
 
                     QMessageBox.warning(self,"发送提示","发送完毕！") 
@@ -1587,8 +1586,8 @@ class Send_bin_Thread(QtCore.QThread):
 
         #最后小包发一次
         temp2 = bin_data_str[bin_len_bao_num*464:]
-        youxiao_lenth_last = "{:02X}".format(bin_len_shengxia+2)
-        bao_xuhao_last = "{:04X}".format(bin_len_bao_num + 1)
+        youxiao_lenth_last = "{:02X}".format(bin_len_shengxia +2)
+        bao_xuhao_last = "{:04X}".format(bin_len_bao_num)
         #填充"00"
         send_bao_last_temp = "".join([ZT1,ZT2,youxiao_lenth_last,MLZ,bao_xuhao_last,temp2,'00'*(232 - bin_len_shengxia)])
         
