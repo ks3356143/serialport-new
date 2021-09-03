@@ -12,6 +12,23 @@
         <!--为echarts准备一个具备大小宽高的Dom-->
         <div id="main"></div>
         <script type="text/javascript">
+            function hex2int(hex) {
+                var len = hex.length, a = new Array(len), code;
+                for (var i = 0; i < len; i++) {
+                    code = hex.charCodeAt(i);
+                    if (48<=code && code < 58) {
+                        code -= 48;
+                    } else {
+                        code = (code & 0xdf) - 65 + 10;
+                    }
+                    a[i] = code;
+                }
+                
+                return a.reduce(function(acc, c) {
+                    acc = 16 * acc + c;
+                    return acc;
+                }, 0);
+            }
             //基于准备好的dom,初始化ecahrts实例
             let myChart = echarts.init(document.getElementById('main'));
             let color1=['#65b5c2', '#ffbe05','#1dc499','#177bbb', '#3ddcde','#177bbb','#1ccacc', '#e33244','#ffbe05','#3ddcde']
@@ -108,7 +125,7 @@
                                     if(jsons[i].name === option.series[j].name){
                                         result = option.series[j].data;
                                         result.shift();
-                                        result.push(jsons[i].value);
+                                        result.push(hex2int(jsons[i].value));
                                         isok = 1;
                                         break;
                                     }
@@ -121,7 +138,7 @@
                                 }
 
                                 result.shift();
-                                result.push(jsons[i].value);
+                                result.push(hex2int(jsons[i].value));
                                 return result;
                             })()
                     }

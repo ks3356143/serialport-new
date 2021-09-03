@@ -961,7 +961,7 @@ class userMain(QMainWindow,Ui_MainWindow):
             #+地址2（4字节）+长度（1）字节,长度是固定'04'【传输显示04】
             frame_tou = 'E116' # 帧头固定的，那么有小长度占1字节，组装（'E116220c06110800010c068498'）
             frame_type = '22' # 固定的命令字
-            frame_sigle_lang = '01' #固定每个参数宽度,不一定是4~~~~~~@@,给DSP的地址长度
+            frame_sigle_lang = '04' #固定每个参数宽度,不一定是4~~~~~~@@,给DSP的地址长度
             frame_datas = ''  #变量位加上它自己的sigle长度位
             for i in range(len(self.user_para_addr)):
                 one_datazhen = self.user_para_addr[i] + frame_sigle_lang #注意这里固定了一个参数带的数据的字节数为1@@@@

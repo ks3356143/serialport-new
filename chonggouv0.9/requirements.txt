@@ -9,3 +9,4 @@ QtWebEngine == 5.2
 pandas
 numpy
 qtmodern
+pywin32

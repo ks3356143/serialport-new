@@ -815,7 +815,7 @@
               <number>8000</number>
              </property>
              <property name="singleStep">
-              <number>1</number>
+              <number>100</number>
              </property>
             </widget>
            </item>
