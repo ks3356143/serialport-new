@@ -22,7 +22,7 @@ import re
 import codecs
 import threading
 import win32con
-from win32process import ExitProcess, SuspendThread, ResumeThread
+from win32process import SuspendThread, ResumeThread
 import ctypes
 
 from PyQt5 import QtCore,QtGui
